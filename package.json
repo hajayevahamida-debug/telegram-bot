@@ -1,0 +1,25 @@
+{
+  "name": "telegram-valyuta-obhavo-bot",
+  "version": "1.0.0",
+  "description": "Valyuta kurslari va Ob-havo ma'lumotlarini taqdim etuvchi Telegram bot (Node.js)",
+  "main": "src/bot.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/bot.js",
+    "dev": "node --watch src/bot.js"
+  },
+  "keywords": [
+    "telegram-bot",
+    "currency",
+    "weather",
+    "telegraf",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.20.0",
+    "dotenv": "^17.4.2",
+    "telegraf": "^4.16.3"
+  }
+}
