@@ -1,9 +1,9 @@
-import { Telegraf } from 'telegraf';
+import { Telegraf, Markup } from 'telegraf';
 import { message } from 'telegraf/filters';
 import dotenv from 'dotenv';
 import { getPopularRatesMessage, convertCurrency } from './services/currency.js';
 import { REGIONS, fetchWeather } from './services/weather.js';
-import { mainMenu, weatherMenu, currencyInlineMenu } from './keyboards/menus.js';
+import { mainMenu, weatherMenu, currencyInlineMenu, weatherInlineMenu } from './keyboards/menus.js';
 
 // .env faylidan o'zgaruvchilarni yuklash
 dotenv.config();
@@ -100,11 +100,56 @@ bot.action('refresh_currency', async (ctx) => {
 // Ob-havo bo'limi
 bot.hears('⛅ Ob-havo', async (ctx) => {
   const text =
-    `⛅ <b>Ob-havo bo‘limi</b>\n\n` +
-    `O‘zingizga kerakli viloyatni tanlang yoki pastdagi ` +
-    `<b>«📍 Joylashuvim bo‘yicha ob-havo»</b> tugmasi orqali o‘z manzilingizdagi ob-havoni biling:`;
+    `⛅ <b>Ob-havo ma‘lumotlari:</b>\n\n` +
+    `Kerakli viloyatni quyidagi tugmalardan tanlang yoki pastdagi ` +
+    `<b>«📍 Joylashuvim bo‘yicha ob-havo»</b> orqali o‘z joylashuvingizni yuboring:`;
 
-  await ctx.replyWithHTML(text, weatherMenu);
+  await ctx.replyWithHTML(text, {
+    ...weatherInlineMenu,
+    reply_markup: {
+      ...weatherInlineMenu.reply_markup,
+    },
+  });
+});
+
+// Inline ob-havo tugmalari bosilganda
+bot.action(/^weather_(.+)$/, async (ctx) => {
+  const regionKey = ctx.match[1];
+  const region = REGIONS[regionKey];
+
+  if (!region) {
+    return ctx.answerCbQuery('Viloyat topilmadi.');
+  }
+
+  await ctx.answerCbQuery(`${regionKey} ob-havosi yuklanmoqda...`);
+  const weatherText = await fetchWeather(region.lat, region.lon, region.name);
+
+  const backKeyboard = Markup.inlineKeyboard([
+    [Markup.button.callback('🔙 Viloyatlar ro‘yxati', 'weather_list')],
+    [Markup.button.callback('🔄 Yangilash', `weather_${regionKey}`)],
+  ]);
+
+  try {
+    await ctx.editMessageText(weatherText, {
+      parse_mode: 'HTML',
+      ...backKeyboard,
+    });
+  } catch (e) {}
+});
+
+// Viloyatlar ro'yxatiga qaytish inline tugmasi
+bot.action('weather_list', async (ctx) => {
+  await ctx.answerCbQuery();
+  const text =
+    `⛅ <b>Ob-havo ma‘lumotlari:</b>\n\n` +
+    `Kerakli viloyatni tanlang:`;
+
+  try {
+    await ctx.editMessageText(text, {
+      parse_mode: 'HTML',
+      ...weatherInlineMenu,
+    });
+  } catch (e) {}
 });
 
 // GPS Joylashuv yuborilganda ob-havoni aniqlash
