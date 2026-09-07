@@ -50,7 +50,46 @@ function getWeatherDesc(code) {
 }
 
 /**
- * Open-Meteo API orqali ob-havo ma'lumotlarini oladi
+ * Zaxira (fallback) ob-havo xizmati: wttr.in
+ */
+async function fetchWeatherFallback(lat, lon, locationName) {
+  const url = `https://wttr.in/${lat},${lon}?format=j1`;
+  const response = await axios.get(url, {
+    headers: { 'User-Agent': 'curl/7.68.0' },
+    timeout: 10000,
+  });
+
+  const cur = response.data.current_condition?.[0] || {};
+  const weatherDay = response.data.weather?.[0] || {};
+
+  const temp = cur.temp_C ?? '--';
+  const feelsLike = cur.FeelsLikeC ?? '--';
+  const humidity = cur.humidity ?? '--';
+  const wind = cur.windspeedKmph ?? '--';
+  const desc = cur.weatherDesc?.[0]?.value || 'Musaffo';
+
+  const tempMax = weatherDay.maxtempC;
+  const tempMin = weatherDay.mintempC;
+
+  let forecastExtra = '';
+  if (tempMax !== undefined && tempMin !== undefined) {
+    forecastExtra = `📊 Bugun: min <b>${tempMin}°C</b> / max <b>${tempMax}°C</b>\n`;
+  }
+
+  return (
+    `📍 <b>Hudud: ${locationName}</b>\n\n` +
+    `☀️ <b>Holat:</b> ${desc}\n` +
+    `🌡 <b>Harorat:</b> ${temp}°C\n` +
+    `🤔 <b>His qilinishi:</b> ${feelsLike}°C\n` +
+    `💧 <b>Namlik:</b> ${humidity}%\n` +
+    `💨 <b>Shamol tezligi:</b> ${wind} km/soat\n` +
+    `${forecastExtra}\n` +
+    `🕒 <i>Ma'lumotlar real vaqtda yangilandi</i>`
+  );
+}
+
+/**
+ * Asosiy ob-havo ma'lumotlarini olish (Open-Meteo va zaxira wttr.in)
  */
 export async function fetchWeather(lat, lon, locationName = 'Joylashuv') {
   const url =
@@ -59,7 +98,14 @@ export async function fetchWeather(lat, lon, locationName = 'Joylashuv') {
     `&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
 
   try {
-    const response = await axios.get(url, { timeout: 10000 });
+    const response = await axios.get(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+      },
+      timeout: 8000,
+    });
     const data = response.data;
 
     const current = data.current || {};
@@ -91,8 +137,13 @@ export async function fetchWeather(lat, lon, locationName = 'Joylashuv') {
       `${forecastExtra}\n` +
       `🕒 <i>Ma'lumotlar real vaqtda yangilandi</i>`
     );
-  } catch (error) {
-    console.error('Weather API xatolik:', error.message);
-    return `⚠️ Ob-havo ma'lumotlarini olishda xatolik yuz berdi: ${error.message}`;
+  } catch (openMeteoError) {
+    console.warn('Open-Meteo xatolik, zaxira xizmatga o‘tilmoqda...', openMeteoError.message);
+    try {
+      return await fetchWeatherFallback(lat, lon, locationName);
+    } catch (fallbackError) {
+      console.error('Ikkala ob-havo xizmati ham javob bermadi:', fallbackError.message);
+      return `⚠️ Hozirda ob-havo xizmatlariga ulanishda muammo bo‘lmoqda. Iltimos, 1 daqiqadan so‘ng qayta urinib ko‘ring.`;
+    }
   }
 }
