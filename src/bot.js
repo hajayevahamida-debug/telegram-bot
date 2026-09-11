@@ -204,26 +204,44 @@ bot.on(message('text'), async (ctx) => {
   );
 });
 
-// Botni ishga tushirish
+// Server (Render, Koyeb va boshqa bulutli xizmatlar) uchun mini HTTP port
+import http from 'http';
+const PORT = process.env.PORT || 3000;
+let botReady = false;
+
+const server = http.createServer((req, res) => {
+  const isHealthCheck = req.url === '/health';
+  const statusCode = isHealthCheck && !botReady ? 503 : 200;
+
+  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({
+    status: botReady ? 'ok' : 'starting',
+    botReady,
+  }));
+});
+
+server.listen(PORT, () => {
+  console.log(`🌐 Web server ${PORT}-portda tinglamoqda (Cloud xizmatlar uchun).`);
+});
+
+// Botni ishga tushirish. Telegram API bilan ulanish amalga oshmasa,
+// jarayon xato kodi bilan tugaydi; hosting uni avtomatik qayta ishga tushiradi.
 console.log('\n' + '*'.repeat(50));
 console.log('🤖 Bot ishga tushirilmoqda...');
 console.log('Telegram‘ga kirib /start buyrug‘ini yuboring.');
 console.log('Botni to‘xtatish uchun: Ctrl + C bosing.');
 console.log('*'.repeat(50) + '\n');
 
-bot.launch().catch((err) => {
-  console.error('Botni ishga tushirishda xatolik:', err);
-});
-
-// Server (Render, Koyeb va boshqa bulutli xizmatlar) uchun mini HTTP port
-import http from 'http';
-const PORT = process.env.PORT || 3000;
-http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-  res.end('Valyuta va Ob-havo Telegram Boti 24/7 faol holatda!');
-}).listen(PORT, () => {
-  console.log(`🌐 Web server ${PORT}-portda tinglamoqda (Cloud xizmatlar uchun).`);
-});
+bot.telegram.getMe()
+  .then(() => {
+    botReady = true;
+    console.log('✅ Telegram bot muvaffaqiyatli ulandi.');
+    return bot.launch();
+  })
+  .catch((err) => {
+    console.error('Botni ishga tushirishda xatolik:', err);
+    server.close(() => process.exit(1));
+  });
 
 // To'xtatish signallari
 process.once('SIGINT', () => bot.stop('SIGINT'));
